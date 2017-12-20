@@ -125,4 +125,12 @@ contract DeLottery is Pausable {
 		return (length>0);
 	}
 
+		/**
+	* @dev Function to get ether from contract
+	* @param amount Amount in wei to withdraw
+	*/
+	function withdrawEther(address recipient, uint amount) external onlyOwner {
+		recipient.transfer(amount);
+	}
+
 }
