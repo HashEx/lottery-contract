@@ -2,17 +2,13 @@ pragma solidity ^0.4.18;
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
 import 'zeppelin-solidity/contracts/lifecycle/Pausable.sol';
 
-/*
-	подумать - что есть во время розыгрыша меняется стоимость
-*/
-
 contract DeLottery is Pausable {
 	using SafeMath for uint256;
 
 	uint32 public constant QUORUM = 3;
 
 	address[] participants;
-	uint participantsCount;
+	uint public participantsCount;
 
 	uint public ticketPrice = 1 ether;
 
@@ -24,9 +20,6 @@ contract DeLottery is Pausable {
 
 	mapping(address => bool) lotteryRunners;
 
-	/**
-   	* @dev Throws if called by any account other than the owner.
-   	*/
    	modifier canRunLottery() {
    		require(lotteryRunners[msg.sender]);
    		_;
@@ -37,11 +30,21 @@ contract DeLottery is Pausable {
 	}
 
 	function buyTicket() public payable whenNotPaused {
-		require(msg.value == ticketPrice);
 		require(!isContract(msg.sender));
-		participants.push(msg.sender);
-		participantsCount++;
-		prizeFund = prizeFund.add(ticketPrice);
+		require(participantsCount <= 100);
+
+		uint ticketsBought = msg.value / ticketPrice;
+
+		for(uint16 i = 0; i < ticketsBought; i++) {
+			participants.push(msg.sender);
+			participantsCount++;
+		}
+
+		prizeFund = prizeFund.add(ticketsBought * ticketPrice);
+
+		//return change
+		uint change = msg.value % ticketPrice;
+		msg.sender.transfer(change);
 	}
 
 	function setTicketPrice(uint tickerPrice) external onlyOwner {
@@ -90,6 +93,14 @@ contract DeLottery is Pausable {
 			nextTicketPrice = 0;
 		}
 	}
+	
+	/**
+	* @dev Function to get ether from contract
+	* @param amount Amount in wei to withdraw
+	*/
+	function withdrawEther(address recipient, uint amount) external onlyOwner {
+		recipient.transfer(amount);
+	}
 
 	function generateNextWinner(uint previousWinner, int[] winners, uint participantsCount) private returns(uint) {
 		uint nonce = 0;
@@ -125,12 +136,6 @@ contract DeLottery is Pausable {
 		return (length>0);
 	}
 
-		/**
-	* @dev Function to get ether from contract
-	* @param amount Amount in wei to withdraw
-	*/
-	function withdrawEther(address recipient, uint amount) external onlyOwner {
-		recipient.transfer(amount);
-	}
+
 
 }

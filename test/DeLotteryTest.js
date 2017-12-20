@@ -26,8 +26,15 @@ contract('DeLottery', accounts => {
 		this.lottery = await DeLottery.new()
 	})
 
-	it('should run tests', async function() {
-		await web3.eth.sendTransaction({from: this.owner, to: accounts[1], value: web3.toWei(0.5, 'ether')})
+	it('should buy tickets and return change', async function() {
+		await this.lottery.buyTicket({from: accounts[0], value: web3.toWei(3.999, 'ether')})
+		const count = await this.lottery.participantsCount.call()
+		assert.equal(count, 3, "3 tickets should be bought");
+		console.log('balanse of account: ' + getBalance(accounts[0]))
+
+	})
+
+	it('should run lottery', async function() {
 		await web3.eth.sendTransaction({from: this.owner, to: accounts[1], value: web3.toWei(0.5, 'ether')})
 		await this.lottery.buyTicket({from: accounts[0], value: web3.toWei(1, 'ether')})
 		await this.lottery.buyTicket({from: accounts[1], value: web3.toWei(1, 'ether')})
@@ -47,8 +54,7 @@ contract('DeLottery', accounts => {
 		printBalances(accounts)
 
 		console.log('\n\n\n*********************NEXT RUN*********************')
-		await this.lottery.buyTicket({from: accounts[0], value: web3.toWei(1, 'ether')})
-		await this.lottery.buyTicket({from: accounts[1], value: web3.toWei(1, 'ether')})
+		await this.lottery.buyTicket({from: accounts[0], value: web3.toWei(2, 'ether')})
 		await this.lottery.buyTicket({from: accounts[2], value: web3.toWei(1, 'ether')})
 		await this.lottery.buyTicket({from: accounts[3], value: web3.toWei(1, 'ether')})
 		await this.lottery.buyTicket({from: accounts[4], value: web3.toWei(1, 'ether')})
