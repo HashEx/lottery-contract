@@ -19,6 +19,8 @@ contract DeLottery is Pausable {
 
 	mapping(address => bool) lotteryRunners;
 
+	event Win(address indexed winner, uint prize);
+
    	modifier canRunLottery() {
    		require(lotteryRunners[msg.sender]);
    		_;
@@ -47,17 +49,16 @@ contract DeLottery is Pausable {
 		}
 	}
 
-	function setTicketPrice(uint _ticketPrice) external onlyOwner {
-		if(gamblers.length == 0) {
-			ticketPrice = _ticketPrice;
-			nextTicketPrice = 0;
-		} else {
-			nextTicketPrice = ticketPrice;
-		}
+	function calculateWinnerPrize(uint fund, uint winnersCount) public pure returns (uint prize) {
+		return fund / winnersCount * 19 / 20;
 	}
 
-	function setAsLotteryRunner(address addr, bool canRunLottery) external onlyOwner {
-		lotteryRunners[addr] = canRunLottery;
+	function calculateWinnersCount(uint _gamblersCount) public pure returns (uint count) {
+		if(_gamblersCount < 10) {
+			return 1;
+		} else {
+			return _gamblersCount / 10;
+		}
 	}
 
 	function runLottery() external whenNotPaused canRunLottery {
@@ -79,26 +80,30 @@ contract DeLottery is Pausable {
 			gamblers[uint(winners[i])].transfer(winnerPrize); //safe because gambler can't be a contract
 		}
 
-		//set ticket price
-		if(nextTicketPrice > 0) {
-			ticketPrice = nextTicketPrice;
-			nextTicketPrice = 0;
-		}
+		setTickeetPriceIfNeeded();
 
 		//set initial state
 		prizeFund = 0;
 		gamblers.length = 0;
 	}
 
-	function calculateWinnerPrize(uint prizeFund, uint winnersCount) returns (uint prize) {
-		return prizeFund / winnersCount * 19 / 20;
+	function setTicketPrice(uint _ticketPrice) external onlyOwner {
+		if(gamblers.length == 0) {
+			ticketPrice = _ticketPrice;
+			nextTicketPrice = 0;
+		} else {
+			nextTicketPrice = ticketPrice;
+		}
 	}
 
-	function calculateWinnersCount(uint gamblersCount) returns (uint count) {
-		if(gamblers.length < 10) {
-			return 1;
-		} else {
-			return gamblers.length / 10;
+	function setAsLotteryRunner(address addr, bool isAllowedToRun) external onlyOwner {
+		lotteryRunners[addr] = isAllowedToRun;
+	}
+
+	function setTickeetPriceIfNeeded() private {
+		if(nextTicketPrice > 0) {
+			ticketPrice = nextTicketPrice;
+			nextTicketPrice = 0;
 		}
 	}
 
@@ -110,7 +115,7 @@ contract DeLottery is Pausable {
 		recipient.transfer(amount);
 	}
 
-	function generateNextWinner(uint previousWinner, int[] winners, uint gamblersCount) private returns(uint) {
+	function generateNextWinner(uint previousWinner, int[] winners, uint gamblersCount) private view returns(uint) {
 		uint nonce = 0;
 		uint winner = generateWinner(previousWinner, nonce, gamblersCount);
 
@@ -122,7 +127,7 @@ contract DeLottery is Pausable {
 		return winner;
 	}
 
-	function generateWinner(uint previousWinner, uint nonce, uint gamblersCount) private returns (uint winner) {
+	function generateWinner(uint previousWinner, uint nonce, uint gamblersCount) private view returns (uint winner) {
 		return uint(keccak256(uint(block.blockhash(block.number - 1)), previousWinner, nonce)) % gamblersCount;
 	}
 
