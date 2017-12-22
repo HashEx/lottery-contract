@@ -8,7 +8,6 @@ contract DeLottery is Pausable {
 	uint32 public constant QUORUM = 3;
 
 	address[] gamblers;
-	uint public gamblersCount;
 
 	uint public ticketPrice = 1 ether;
 
@@ -26,18 +25,17 @@ contract DeLottery is Pausable {
    	}
 
 	function DeLottery() public {
-		setAsLotteryRunner(msg.sender, true);
+		lotteryRunners[msg.sender] = true;
 	}
 
 	function () public payable whenNotPaused {
 		require(!isContract(msg.sender));
-		require(gamblersCount <= 100);
+		require(gamblers.length <= 100);
 
 		uint ticketsBought = msg.value / ticketPrice;
 
 		for(uint16 i = 0; i < ticketsBought; i++) {
 			gamblers.push(msg.sender);
-			gamblersCount++;
 		}
 
 		prizeFund = prizeFund.add(ticketsBought * ticketPrice);
@@ -50,7 +48,7 @@ contract DeLottery is Pausable {
 	}
 
 	function setTicketPrice(uint _ticketPrice) external onlyOwner {
-		if(gamblersCount == 0) {
+		if(gamblers.length == 0) {
 			ticketPrice = _ticketPrice;
 			nextTicketPrice = 0;
 		} else {
@@ -58,20 +56,15 @@ contract DeLottery is Pausable {
 		}
 	}
 
-	function setAsLotteryRunner(address addr, bool canRunLottery) public onlyOwner {
+	function setAsLotteryRunner(address addr, bool canRunLottery) external onlyOwner {
 		lotteryRunners[addr] = canRunLottery;
 	}
 
 	function runLottery() external whenNotPaused canRunLottery {
-		require(gamblersCount >= QUORUM);
+		require(gamblers.length >= QUORUM);
 
-		uint winnersCount;
-		if(gamblersCount < 10) {
-			winnersCount = 1;
-		} else {
-			winnersCount = gamblersCount / 10;
-		}
-		uint winnerPrize = prizeFund / winnersCount * 19 / 20;
+		uint winnersCount = calculateWinnersCount(gamblers.length);
+		uint winnerPrize = calculateWinnerPrize(prizeFund, winnersCount);
 
 		int[] memory winners = new int[](winnersCount);
 
@@ -79,25 +72,33 @@ contract DeLottery is Pausable {
 			winners[j] = -1;
 		}
 
-		uint lastWinner = generateWinner(0, 0, gamblersCount);
-		winners[0] = int(lastWinner);
-
-		for(uint i = 1; i < winnersCount; i++) {
-			lastWinner = generateNextWinner(lastWinner, winners, gamblersCount);
+		uint lastWinner = 0;
+		for(uint i = 0; i < winnersCount; i++) {
+			lastWinner = generateNextWinner(lastWinner, winners, gamblers.length);
 			winners[i] = int(lastWinner);
+			gamblers[uint(winners[i])].transfer(winnerPrize); //safe because gambler can't be a contract
+		}
+
+		//set ticket price
+		if(nextTicketPrice > 0) {
+			ticketPrice = nextTicketPrice;
+			nextTicketPrice = 0;
 		}
 
 		//set initial state
 		prizeFund = 0;
-		gamblersCount = 0;
+		gamblers.length = 0;
+	}
 
-		for(uint k = 0; k < winnersCount; k++) {
-			gamblers[uint(winners[k])].transfer(winnerPrize);
-		}
+	function calculateWinnerPrize(uint prizeFund, uint winnersCount) returns (uint prize) {
+		return prizeFund / winnersCount * 19 / 20;
+	}
 
-		if(nextTicketPrice > 0) {
-			ticketPrice = nextTicketPrice;
-			nextTicketPrice = 0;
+	function calculateWinnersCount(uint gamblersCount) returns (uint count) {
+		if(gamblers.length < 10) {
+			return 1;
+		} else {
+			return gamblers.length / 10;
 		}
 	}
 

@@ -19,6 +19,11 @@ const printBalances = (accounts) => {
 	console.log('---------------------------------------------')
 }
 
+const buyTicket = (lottery, account, ethers) => {
+	return web3.eth.sendTransaction({from: account, to: lottery, 
+		gas: 1000000, value: web3.toWei(ethers, 'ether')})
+}
+
 contract('DeLottery', accounts => {
 
 	beforeEach(async function() {
@@ -32,46 +37,31 @@ contract('DeLottery', accounts => {
 			to: this.lottery.address, 
 			value: web3.toWei(1, 'ether'),
 			gas: 1000000})
-		// const count = await this.lottery.gamblersCount.call()
-		// assert.equal(count, 3, "3 tickets should be bought");
-		// console.log('balanse of account: ' + getBalance(accounts[0]))
-
 	})
 
 	it('should run lottery', async function() {
-		await web3.eth.sendTransaction({from: this.owner, 
-			to: accounts[1], 
-			value: web3.toWei(0.5, 'ether'),
-			gas: 1000000})
+		await buyTicket(this.lottery.address, accounts[0], 1)
+		await buyTicket(this.lottery.address, accounts[1], 1)
+		await buyTicket(this.lottery.address, accounts[2], 1)
+		await buyTicket(this.lottery.address, accounts[3], 1)
 
-		await web3.eth.sendTransaction({from: this.owner, to: this.lottery.address, 
-			gas: 1000000, value: web3.toWei(1, 'ether')})
-		// await web3.eth.sendTransaction({from: this.owner, to: this.lottery.address, value: web3.toWei(1, 'ether')})
-		// await web3.eth.sendTransaction({from: this.owner, to: this.lottery.address, value: web3.toWei(1, 'ether')})
+		let prize = await this.lottery.prizeFund.call()
+		console.log('prize fund is: ' + prize.valueOf())
 
+		await this.lottery.runLottery()
+		printBalances(accounts)
 
-		// let prize = await this.lottery.prizeFund.call()
-		// console.log('prize fund is: ' + prize.valueOf())
+		console.log('\n\n\n*********************NEXT RUN*********************')
+		await buyTicket(this.lottery.address, accounts[9], 1)
+		await buyTicket(this.lottery.address, accounts[8], 1)
+		await buyTicket(this.lottery.address, accounts[7], 1)
+		await buyTicket(this.lottery.address, accounts[6], 1)
 
-		// await this.lottery.runLottery()
-		// printBalances(accounts)
+		prize = await this.lottery.prizeFund.call()
+		console.log('prize fund is: ' + prize.valueOf())
 
-		// console.log('\n\n\n*********************NEXT RUN*********************')
-		// await this.lottery.buyTicket({from: accounts[0], value: web3.toWei(2, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[2], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[3], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[4], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[5], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[6], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[7], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[8], value: web3.toWei(1, 'ether')})
-		// await this.lottery.buyTicket({from: accounts[9], value: web3.toWei(1, 'ether')})
-
-		// prize = await this.lottery.prizeFund.call()
-		// console.log('prize fund is: ' + prize.valueOf())
-
-		// await this.lottery.runLottery()
-		// printBalances(accounts)
+		await this.lottery.runLottery()
+		printBalances(accounts)
 
 	})
 
