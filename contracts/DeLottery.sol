@@ -15,11 +15,15 @@ contract DeLottery is Pausable {
 
 	uint public nextTicketPrice = 0;
 
+	uint public stage;
+
+	uint public maxTickets = 100;
+
 	mapping(address => mapping(address => uint)) prizes;
 
 	mapping(address => bool) lotteryRunners;
 
-	event Win(address indexed winner, uint prize);
+	event Win(uint stage, uint ticketsCount, uint ticketNumber, address winner, uint prize);
 
    	modifier canRunLottery() {
    		require(lotteryRunners[msg.sender]);
@@ -28,79 +32,99 @@ contract DeLottery is Pausable {
 
 	function DeLottery() public {
 		lotteryRunners[msg.sender] = true;
+		gamblers.push(0x0);
 	}
 
 	function () public payable whenNotPaused {
 		require(!isContract(msg.sender));
-		require(gamblers.length <= 100);
+		require(msg.value >= ticketPrice);
+		uint availableTicketsToBuy = maxTickets - getTicketsCount();
+		require(availableTicketsToBuy > 0);
 
-		uint ticketsBought = msg.value / ticketPrice;
+		uint ticketsBought = msg.value.div(ticketPrice);
 
-		for(uint16 i = 0; i < ticketsBought; i++) {
+		uint ticketsToBuy;
+		uint refund = 0;
+		if(ticketsBought > availableTicketsToBuy) {
+			ticketsToBuy = availableTicketsToBuy;
+			refund = (ticketsBought - availableTicketsToBuy).mul(ticketPrice);
+		} else {
+			ticketsToBuy = ticketsBought;
+		}
+
+		for(uint16 i = 0; i < ticketsToBuy; i++) {
 			gamblers.push(msg.sender);
 		}
 
-		prizeFund = prizeFund.add(ticketsBought * ticketPrice);
+		prizeFund = prizeFund.add(ticketsToBuy.mul(ticketPrice));
 
 		//return change
-		uint change = msg.value % ticketPrice;
-		if(change > 0) {
-			msg.sender.transfer(change);
+		refund = refund.add(msg.value % ticketPrice);
+		if(refund > 0) {
+			msg.sender.transfer(refund);
 		}
 	}
 
 	function calculateWinnerPrize(uint fund, uint winnersCount) public pure returns (uint prize) {
-		return fund / winnersCount * 19 / 20;
+		return fund.div(winnersCount).mul(19).div(20);
 	}
 
-	function calculateWinnersCount(uint _gamblersCount) public pure returns (uint count) {
-		if(_gamblersCount < 10) {
+	function calculateWinnersCount(uint _ticketsCount) public pure returns (uint count) {
+		if(_ticketsCount < 10) {
 			return 1;
 		} else {
-			return _gamblersCount / 10;
+			return _ticketsCount.div(10);
 		}
 	}
 
 	function runLottery() external whenNotPaused canRunLottery {
-		require(gamblers.length >= QUORUM);
+		uint gamblersLength = getTicketsCount();
+		require(gamblersLength >= QUORUM);
 
-		uint winnersCount = calculateWinnersCount(gamblers.length);
+		uint winnersCount = calculateWinnersCount(gamblersLength);
 		uint winnerPrize = calculateWinnerPrize(prizeFund, winnersCount);
 
 		int[] memory winners = new int[](winnersCount);
-
-		for(uint64 j = 0; j < winnersCount; j++) {
-			winners[j] = -1;
-		}
 
 		uint lastWinner = 0;
 		for(uint i = 0; i < winnersCount; i++) {
 			lastWinner = generateNextWinner(lastWinner, winners, gamblers.length);
 			winners[i] = int(lastWinner);
-			gamblers[uint(winners[i])].transfer(winnerPrize); //safe because gambler can't be a contract
+			address winnerAddress = gamblers[uint(winners[i])];
+			winnerAddress.transfer(winnerPrize); //safe because gambler can't be a contract
+			Win(stage, gamblersLength, lastWinner, winnerAddress, winnerPrize);
 		}
 
-		setTickeetPriceIfNeeded();
+		setTicketPriceIfNeeded();
 
 		//set initial state
 		prizeFund = 0;
-		gamblers.length = 0;
+		gamblers.length = 1;
+		stage += 1;
+	}
+
+	function getTicketsCount() public view returns (uint) {
+		return gamblers.length - 1;
 	}
 
 	function setTicketPrice(uint _ticketPrice) external onlyOwner {
-		if(gamblers.length == 0) {
+		if(getTicketsCount() == 0) {
 			ticketPrice = _ticketPrice;
 			nextTicketPrice = 0;
 		} else {
-			nextTicketPrice = ticketPrice;
+			nextTicketPrice = _ticketPrice;
 		}
+	}
+
+	function setMaxTickets(uint _maxTickets) external onlyOwner {
+		maxTickets = _maxTickets;
 	}
 
 	function setAsLotteryRunner(address addr, bool isAllowedToRun) external onlyOwner {
 		lotteryRunners[addr] = isAllowedToRun;
 	}
 
-	function setTickeetPriceIfNeeded() private {
+	function setTicketPriceIfNeeded() private {
 		if(nextTicketPrice > 0) {
 			ticketPrice = nextTicketPrice;
 			nextTicketPrice = 0;
@@ -146,7 +170,7 @@ contract DeLottery is Pausable {
 			//retrieve the size of the code on target address, this needs assembly
 			length := extcodesize(_addr)
 		}
-		return (length>0);
+		return length > 0;
 	}
 
 }
