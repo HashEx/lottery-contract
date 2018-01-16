@@ -23,7 +23,7 @@ contract DeLottery is Pausable {
 
 	mapping(address => bool) lotteryRunners;
 
-	event Win(uint stage, uint ticketsCount, uint ticketNumber, address winner, uint prize);
+	event Win(uint indexed stage, uint ticketsCount, uint ticketNumber, address indexed winner, uint prize);
 
    	modifier canRunLottery() {
    		require(lotteryRunners[msg.sender]);
